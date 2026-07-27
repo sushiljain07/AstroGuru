@@ -141,13 +141,8 @@ export default function PersonalHome() {
 
   function openReport(topicId) {
     if (!profile) return
-    if (topicId === 'career') {
-      // Dedicated career report page with its own AI analysis
-      navigate('/career-report')
-      return
-    }
-    // Finance, relationship, health → /insights with topic set,
-    // which opens TopicReportTab for the matching report endpoint.
+    // Career, finance, relationship, health → /insights with topic set,
+    // which builds the Reading/Rajyogas/Report subtabs (buildSubtabs in Insights.jsx).
     navigate('/insights', {
       state: {
         data: profile.chart,
