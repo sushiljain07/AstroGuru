@@ -65,3 +65,17 @@ export function hasPremiumAccess() {
   // if (isDevUnlocked()) return true
   // return false
 }
+
+// Placeholder for a future finer-grained gate — e.g. once the Career Report
+// grows sections worth splitting into free vs. premium tiers. Everything is
+// free for now, so this always returns true; no component calls this yet.
+// eslint-disable-next-line no-unused-vars
+export function hasSectionAccess(sectionKey) {
+  // Same "always true until real payments exist" story as hasPremiumAccess().
+  return true
+
+  // Future per-section logic — restore/extend when real entitlements exist:
+  // if (!PAYWALL_ENABLED) return true
+  // if (isDevUnlocked()) return true
+  // return FREE_SECTIONS.has(sectionKey)
+}

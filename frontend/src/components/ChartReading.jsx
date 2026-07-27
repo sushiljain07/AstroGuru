@@ -31,7 +31,6 @@ function KundliWheelBg() {
 // Section display config — ordered as they appear in the prediction
 const SECTION_CONFIG = [
   { key: 'identity',       title: 'Your Cosmic Identity',          icon: '🌟' },
-  { key: 'rajyogas',       title: 'The Raj Yogas in Your Chart',   icon: '👑' },
   { key: 'strengths',      title: 'Your Career Domain & Strengths',icon: '💪' },
   { key: 'currentperiod',  title: 'Your Current Life Period',       icon: '⏳' },
   { key: 'prediction',     title: 'Your Next 2–3 Years',           icon: '🔮' },
@@ -39,12 +38,13 @@ const SECTION_CONFIG = [
   { key: 'relationships',  title: 'Your Love & Relationships',      icon: '💫' },
 ]
 
-export default function ChartReading({ input }) {
+export default function ChartReading({ input, topic, onOpenRajyogas }) {
   const { t, i18n } = useTranslation()
   const { isAuthenticated } = useAuth()
 
   const [status, setStatus]           = useState('idle')
   const [predSections, setPredSections] = useState({})
+  const [activeYogas, setActiveYogas] = useState([])
   const [errorMsg, setErrorMsg]       = useState('')
   const [provider, setProvider]       = useState(null)
 
@@ -78,6 +78,7 @@ export default function ChartReading({ input }) {
 
       const secs = data.prediction_sections || {}
       setPredSections(secs)
+      setActiveYogas(data.active_yogas || [])
       setProvider(data.llm_provider || null)
       setStatus('done')
 
@@ -179,30 +180,8 @@ export default function ChartReading({ input }) {
         const content = predSections[key]
         if (!content) return null
         const isVisible = visible.includes(key)
-        const isRajyoga       = key === 'rajyogas'
         const isHealth        = key === 'health'
         const isRelationships = key === 'relationships'
-
-        if (isRajyoga) return (
-          <div key={key}
-               className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-700
-                          ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}
-               style={{
-                 background: '#1A0A3B',
-                 border: '2px solid #D4AF37',
-                 boxShadow: '0 0 28px rgba(212,175,55,0.18)',
-               }}>
-            <KundliWheelBg />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">{icon}</span>
-                <h3 className="font-extrabold text-lg" style={{ color: '#D4AF37' }}>{title}</h3>
-              </div>
-              <p className="text-white text-sm leading-relaxed font-medium"
-                 style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
-            </div>
-          </div>
-        )
 
         if (isHealth) return (
           <div key={key}
@@ -249,6 +228,37 @@ export default function ChartReading({ input }) {
           </div>
         )
       })}
+
+      {/* ── RAJ YOGA TEASER — deterministic, links to the Rajyogas tab which is
+          the single source of truth for the full breakdown (career topic only,
+          since only career has a Rajyogas tab to send people to). ──────────── */}
+      {topic === 'career' && activeYogas.length > 0 && (
+        <div className="relative overflow-hidden rounded-2xl p-6"
+             style={{
+               background: '#1A0A3B',
+               border: '2px solid #D4AF37',
+               boxShadow: '0 0 28px rgba(212,175,55,0.18)',
+             }}>
+          <KundliWheelBg />
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">👑</span>
+              <h3 className="font-extrabold text-lg" style={{ color: '#D4AF37' }}>
+                You have {activeYogas.length} active Raj Yoga{activeYogas.length > 1 ? 's' : ''}
+              </h3>
+            </div>
+            <p className="text-white text-sm leading-relaxed font-medium mb-4">
+              Including {activeYogas.slice(0, 2).map(y => y.name).join(' and ')}
+              {activeYogas.length > 2 ? ', and more' : ''} — see the full breakdown of what each one means for you.
+            </p>
+            <button onClick={onOpenRajyogas}
+              className="px-4 py-2 rounded-lg font-semibold text-sm"
+              style={{ background: '#D4AF37', color: '#1A0A3B' }}>
+              See my Raj Yogas →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── WHATSAPP LEAD CAPTURE ─────────────────────────────────────────── */}
       <div className={`transition-all duration-700

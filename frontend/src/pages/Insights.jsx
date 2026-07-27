@@ -77,13 +77,13 @@ export default function Insights() {
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 pt-6 pb-8 sm:pb-4">
         <Suspense fallback={<TabLoader />}>
           <div className={activeSub === 'reading' ? 'tab-fade' : 'hidden'}>
-            <ChartReading input={input} />
+            <ChartReading input={input} topic={topicId} onOpenRajyogas={() => setActiveSub('rajyogas')} />
           </div>
           <div className={activeSub === 'rajyogas' ? 'tab-fade' : 'hidden'}>
             <RajyogasTab input={input} />
           </div>
           <div className={activeSub === 'career' ? 'tab-fade' : 'hidden'}>
-            <CareerReportTab input={input} />
+            <CareerReportTab input={input} onOpenRajyogas={() => setActiveSub('rajyogas')} />
           </div>
           {(topicId === 'relationship' || topicId === 'finance' || topicId === 'health') && (
             <div className={activeSub === topicId ? 'tab-fade' : 'hidden'}>
