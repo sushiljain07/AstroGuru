@@ -37,53 +37,30 @@ const SECTION_CONFIG = [
   { key: 'prediction',     title: 'Your Next 2–3 Years',           icon: '🔮' },
   { key: 'health',         title: 'Your Health & Vitality',        icon: '💚' },
   { key: 'relationships',  title: 'Your Love & Relationships',      icon: '💫' },
-  { key: 'bridge',         title: 'What Your Full Report Reveals', icon: '🗝️'  },
 ]
 
-const BENEFITS = [
-  'Every Raj Yoga in your chart + exact activation procedure',
-  'Your peak career window — the year, the duration, the action',
-  'Job vs Business — what your chart actually favors',
-  'Personalized gemstone or mantra for your specific chart',
-  'Your ideal career field based on your cosmic blueprint',
-]
-
-export default function ChartReading({ input, onSwitchToCareer }) {
+export default function ChartReading({ input }) {
   const { t, i18n } = useTranslation()
   const { isAuthenticated } = useAuth()
 
   const [status, setStatus]           = useState('idle')
   const [predSections, setPredSections] = useState({})
-  const [teasers, setTeasers]         = useState(null)
   const [errorMsg, setErrorMsg]       = useState('')
   const [provider, setProvider]       = useState(null)
 
   // Staggered visibility per section
   const [visible, setVisible]         = useState([])
-  const [showTeasers, setShowTeasers] = useState(false)
-  const [showCta, setShowCta]         = useState(false)
   const [showWa, setShowWa]           = useState(false)
-
-  // Exit intent
-  const [showExitPopup, setShowExitPopup] = useState(false)
-  const exitShown = useRef(false)
 
   // WhatsApp
   const [waNumber, setWaNumber]       = useState('')
   const [waSubmitted, setWaSubmitted] = useState(false)
 
-  const ctaRef = useRef(null)
-
   async function generate() {
     setStatus('loading')
     setPredSections({})
-    setTeasers(null)
     setVisible([])
-    setShowTeasers(false)
-    setShowCta(false)
     setShowWa(false)
-    exitShown.current = false
-    setShowExitPopup(false)
     setErrorMsg('')
 
     try {
@@ -101,7 +78,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
 
       const secs = data.prediction_sections || {}
       setPredSections(secs)
-      setTeasers(data.teasers || null)
       setProvider(data.llm_provider || null)
       setStatus('done')
 
@@ -113,9 +89,7 @@ export default function ChartReading({ input, onSwitchToCareer }) {
         }
       })
       const base = count * 380 + 300
-      setTimeout(() => setShowTeasers(true), base)
-      setTimeout(() => setShowCta(true),     base + 900)
-      setTimeout(() => setShowWa(true),      base + 1700)
+      setTimeout(() => setShowWa(true), base + 400)
     } catch (e) {
       setErrorMsg(e.message || 'Error generating prediction')
       setStatus('error')
@@ -139,25 +113,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
 
-  // Exit intent — fire once when mouse moves toward browser top. Anonymous-
-  // funnel only: this is a "don't leave without seeing your Raj Yogas"
-  // conversion nudge for someone who hasn't committed to an account yet.
-  // For a signed-in person it has no purpose (they already have full
-  // access) and was firing anyway any time their cursor simply passed
-  // near the top nav — e.g. clicking "Insights" in SiteHeader's tab row,
-  // which sits well within the first 50px of viewport height.
-  useEffect(() => {
-    if (status !== 'done' || isAuthenticated) return
-    function onMove(e) {
-      if (!exitShown.current && e.clientY < 50) {
-        exitShown.current = true
-        setShowExitPopup(true)
-      }
-    }
-    window.addEventListener('mousemove', onMove)
-    return () => window.removeEventListener('mousemove', onMove)
-  }, [status, isAuthenticated])
-
   function handleWaSubmit() {
     if (waNumber.trim()) {
       try {
@@ -170,11 +125,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
       }
       setWaSubmitted(true)
     }
-  }
-
-  function scrollToCta() {
-    setShowExitPopup(false)
-    setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
   }
 
   // ── IDLE ──────────────────────────────────────────────────────────────────
@@ -221,10 +171,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
   )
 
   // ── DONE ──────────────────────────────────────────────────────────────────
-  const teaser1 = teasers?.teaser1 || 'Activation Ritual for Your Raj Yogas'
-  const teaser2 = teasers?.teaser2 || 'Your Peak Career Window'
-  const teaser3 = teasers?.teaser3 || 'Job or Business? What Your Chart Actually Says'
-
   return (
     <div className="max-w-2xl mx-auto py-4 px-2 space-y-4">
 
@@ -234,7 +180,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
         if (!content) return null
         const isVisible = visible.includes(key)
         const isRajyoga       = key === 'rajyogas'
-        const isBridge        = key === 'bridge'
         const isHealth        = key === 'health'
         const isRelationships = key === 'relationships'
 
@@ -256,23 +201,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
               <p className="text-white text-sm leading-relaxed font-medium"
                  style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
             </div>
-          </div>
-        )
-
-        if (isBridge) return (
-          <div key={key}
-               className={`rounded-xl p-5 transition-all duration-700
-                          ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}
-               style={{
-                 background: 'linear-gradient(135deg,#2D1B69,#1A0A3B)',
-                 border: '1px solid rgba(212,175,55,0.4)',
-               }}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{icon}</span>
-              <h3 className="font-bold text-base" style={{ color: '#D4AF37' }}>{title}</h3>
-            </div>
-            <p className="text-gray-200 text-sm leading-relaxed"
-               style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
           </div>
         )
 
@@ -321,95 +249,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
           </div>
         )
       })}
-
-      {/* ── THREE LOCKED TEASER CARDS ─────────────────────────────────────── */}
-      <div className={`transition-all duration-700
-                      ${showTeasers ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        {showTeasers && (
-          <>
-            <p className="text-center text-xs text-ink-faint mb-3 font-medium uppercase tracking-wider">
-              Locked in Your Full Report
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[teaser1, teaser2, teaser3].map((title, i) => (
-                <div key={i} className="rounded-xl p-4"
-                     style={{ background: '#1A0A3B', border: '1px solid rgba(212,175,55,0.4)' }}>
-                  <div className="flex items-start gap-2 mb-2">
-                    <span className="shrink-0 text-lg mt-0.5" style={{ color: '#D4AF37' }}>🔒</span>
-                    <p className="font-semibold text-sm leading-tight" style={{ color: '#D4AF37' }}>{title}</p>
-                  </div>
-                  <p className="text-white text-xs leading-relaxed"
-                     style={{ filter: 'blur(4px)', userSelect: 'none' }}>
-                    Revealed exclusively in your full Career Report
-                  </p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── CONVERSION SECTION ────────────────────────────────────────────── */}
-      <div className={`transition-all duration-700
-                      ${showCta ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-           ref={ctaRef}>
-        {showCta && (
-          <div className="rounded-2xl p-6 space-y-5"
-               style={{ background: '#1A0A3B', border: '1px solid rgba(212,175,55,0.35)' }}>
-
-            <h3 className="font-bold text-center text-lg" style={{ color: '#D4AF37' }}>
-              🌟 Your Full CareerJyotish Report Includes:
-            </h3>
-
-            <ul className="space-y-2">
-              {BENEFITS.map((b, i) => (
-                <li key={i} className="flex gap-2 text-white text-sm">
-                  <span className="shrink-0" style={{ color: '#D4AF37' }}>✦</span>
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA Button */}
-            <div className="group relative">
-              <button
-                onClick={onSwitchToCareer}
-                className="w-full py-4 font-bold text-base rounded-xl
-                           transition-transform duration-200 group-hover:scale-[1.03]"
-                style={{
-                  background: 'linear-gradient(135deg,#C9A227,#F5D060,#C9A227)',
-                  color: '#1A0A3B',
-                }}>
-                Unlock My Full Career Report →
-              </button>
-              <p className="absolute -bottom-5 left-0 right-0 text-center text-xs text-gray-500
-                            opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                "Most people who ignore their Raj Yoga never discover what they were truly capable of."
-              </p>
-            </div>
-
-            {/* Trust signals */}
-            <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-400 pt-6">
-              <span>📱 WhatsApp Delivery</span>
-              <span>⚡ Ready in 24 Hours</span>
-              <span>🔒 Secure Payment</span>
-            </div>
-
-            <p className="text-center text-gray-300 text-sm">₹499 only — less than one counselling session</p>
-
-            {/* Testimonial */}
-            <div className="pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <p className="text-gray-300 text-sm italic text-center leading-relaxed">
-                "My free prediction showed me two Raj Yogas I never knew existed. I bought the full
-                report to learn how to activate them. Best ₹499 I ever spent."
-              </p>
-              <p className="text-center text-xs mt-2" style={{ color: '#D4AF37' }}>
-                — Divya M., Nagpur &nbsp;⭐⭐⭐⭐⭐
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* ── WHATSAPP LEAD CAPTURE ─────────────────────────────────────────── */}
       <div className={`transition-all duration-700
@@ -465,36 +304,6 @@ export default function ChartReading({ input, onSwitchToCareer }) {
       <p className="text-center text-[11px] text-ink-faint leading-relaxed px-4 pb-2">
         {t('disclaimer')}
       </p>
-
-      {/* ── EXIT INTENT POPUP ─────────────────────────────────────────────── */}
-      {showExitPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ background: 'rgba(0,0,0,0.82)' }}>
-          <div className="max-w-sm w-full rounded-2xl p-6 text-center"
-               style={{
-                 background: '#2D1B69',
-                 border: '2px solid #D4AF37',
-                 boxShadow: '0 0 40px rgba(212,175,55,0.2)',
-               }}>
-            <div className="text-4xl mb-3">👑</div>
-            <p className="text-white font-bold text-lg mb-3 leading-snug">
-              Wait — your chart shows Raj Yogas that only rare charts carry.
-            </p>
-            <p className="text-gray-300 text-sm mb-5">
-              Are you sure you want to leave without knowing how to activate them?
-            </p>
-            <button onClick={scrollToCta}
-              className="w-full py-3 font-bold rounded-xl mb-3 text-base"
-              style={{ background: 'linear-gradient(135deg,#C9A227,#F5D060,#C9A227)', color: '#1A0A3B' }}>
-              Show Me How →
-            </button>
-            <button onClick={() => setShowExitPopup(false)}
-              className="w-full py-2 text-gray-400 text-sm hover:text-white transition">
-              I'll miss out
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
