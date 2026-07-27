@@ -77,7 +77,7 @@ export default function Insights() {
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 pt-6 pb-8 sm:pb-4">
         <Suspense fallback={<TabLoader />}>
           <div className={activeSub === 'reading' ? 'tab-fade' : 'hidden'}>
-            <ChartReading input={input} onSwitchToCareer={() => setActiveSub('career')} />
+            <ChartReading input={input} />
           </div>
           <div className={activeSub === 'rajyogas' ? 'tab-fade' : 'hidden'}>
             <RajyogasTab input={input} />
