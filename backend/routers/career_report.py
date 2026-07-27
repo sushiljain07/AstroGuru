@@ -3,7 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from models.birth_data import BirthInput
-from models.career_models import CareerReport, CareerSection, CareerOption
+from models.career_models import (
+    CareerReport, CareerSection, CareerOption, AstrologicalEvidence,
+    CareerRoadmap, CareerAlignment,
+)
 from services.chart_context import resolve_birth_context
 from services.astro_calc import calculate_chart
 from services.divisional_charts import calculate_divisional_chart
@@ -30,9 +33,10 @@ def get_career_report(request: Request, body: BirthInput, db=Depends(get_db_opti
     ctx = resolve_birth_context(body.place, body.date, body.time)
     geo, jd_ut, naive_dt = ctx.geo, ctx.jd_ut, ctx.naive_dt
 
-    # 3. Calculate D1 chart and D10 Dasamsa
+    # 3. Calculate D1 chart, D10 Dasamsa, and D2 Hora (wealth context)
     chart = calculate_chart(jd_ut, geo.lat, geo.lon)
     d10   = calculate_divisional_chart(jd_ut, geo.lat, geo.lon, 10)
+    d2    = calculate_divisional_chart(jd_ut, geo.lat, geo.lon, 2)
 
     # 4. Vimshottari dasha
     dasha = calculate_vimshottari(
@@ -57,6 +61,10 @@ def get_career_report(request: Request, body: BirthInput, db=Depends(get_db_opti
             birth_date=body.date,
             gemstone_context=_GEMSTONE_CONTEXT,
             language=body.language,
+            career_stage=body.career_stage,
+            current_profession=body.current_profession,
+            career_concerns=body.career_concerns,
+            d2_chart=d2,
         )
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Career analysis failed: {e}")
@@ -95,15 +103,18 @@ def get_career_report(request: Request, body: BirthInput, db=Depends(get_db_opti
         natural_strengths=_section("natural_strengths"),
         best_career_path=_section("best_career_path"),
         job_vs_business_verdict=_section("job_vs_business_verdict"),
-        career_rajyogas=_section("career_rajyogas"),
         peak_career_window=_section("peak_career_window"),
         current_phase=_section("current_phase"),
+        career_growth=_section("career_growth"),
+        career_money=_section("career_money"),
+        career_challenges=_section("career_challenges"),
         academic_path=_section("academic_path"),
         gemstone_recommendation=_section("gemstone_recommendation"),
         rudraksha_recommendation=_section("rudraksha_recommendation"),
         empowering_remedies=_section("empowering_remedies"),
         closing_blessing=_section("closing_blessing"),
         # Legacy sections (will be None for new-style reports)
+        career_rajyogas=_section("career_rajyogas"),
         lagna_personality=_section("lagna_personality"),
         job_vs_business=_section("job_vs_business"),
         tenth_house_d1=_section("tenth_house_d1"),
@@ -118,6 +129,19 @@ def get_career_report(request: Request, body: BirthInput, db=Depends(get_db_opti
         career_options=career_options or None,
         single_best_career=_section("single_best_career"),
         transit_impact=_section("transit_impact"),
+        active_yogas=report_data.get("active_yogas", []),
+        astrological_evidence=(
+            AstrologicalEvidence(**report_data["astrological_evidence"])
+            if report_data.get("astrological_evidence") else None
+        ),
+        career_roadmap=(
+            CareerRoadmap(**report_data["career_roadmap"])
+            if report_data.get("career_roadmap") else None
+        ),
+        career_alignment=(
+            CareerAlignment(**report_data["career_alignment"])
+            if report_data.get("career_alignment") else None
+        ),
     )
 
     save_report_if_requested(

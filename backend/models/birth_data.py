@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 from datetime import date, time
 
@@ -29,6 +29,19 @@ class BirthInput(BaseModel):
     # compatibility with the relationship-report patch shipped before this
     # field existed.
     marital_status: Optional[str] = "unmarried"
+    # Optional career-report context, captured lazily in CareerReportTab
+    # (skippable — omitted entirely for anyone who skips the capture step
+    # or for any non-career report). Used only by
+    # services/career_analysis.py's generate_career_report() to bias which
+    # of the report's existing sections get emphasized; it must never be
+    # treated as astrological evidence on its own (see that module's
+    # "context, not evidence" prompt guardrail).
+    # e.g. 'student' | '0_3_years' | 'experienced' | 'senior' |
+    # 'entrepreneur' | 'career_break' | 'job_seeker' | 'transition'
+    career_stage: Optional[str] = None
+    current_profession: Optional[str] = Field(default=None, max_length=200)
+    # Up to 3 free-form concern strings, e.g. "Am I in the right career?"
+    career_concerns: Optional[List[str]] = None
     # Opt-in persistence: when set, the report-generating routes (career,
     # rajyogas, relationship, wealth) best-effort save a BirthProfile +
     # Report row for this phone number via services/persistence.py. Omit

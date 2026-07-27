@@ -254,7 +254,11 @@ export default function PersonalHome() {
               <ChartsStrip profile={profile} />
             </Beat>
 
-            <Beat title={t('home_your_reports_label')}>
+            <Beat
+              title={t('home_your_reports_label')}
+              cta={t('home_generate_for_others_cta', 'For someone else')}
+              onCta={() => navigate('/generate')}
+            >
               <ReportsStrip onOpenReport={openReport} featuredId={lifeAreas?.[0]?.topicId ?? 'career'} lifeAreas={lifeAreas} />
             </Beat>
 

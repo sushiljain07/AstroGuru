@@ -1066,46 +1066,12 @@ KEEP LOCKED (the treatment plan = paid report):
 ✗ No D10 / Dasamsa analysis — save for paid report
 
 ═══════════════════════════════════
-RAJ YOGA MEANINGS (use these translations and real meanings):
-═══════════════════════════════════
-Gaja Kesari Yoga → "the Wisdom-Power Combination"
-  Meaning: people with this yoga are remembered; build reputations that outlast titles; both respected for intelligence AND genuinely liked — opens doors that talent alone cannot.
-
-Sasa Yoga (Saturn) → "the Authority Yoga"
-  Meaning: genuine authority that cannot be faked; people follow because they trust the judgment, not just the position; powerful for management, administration, law, engineering.
-
-Hamsa Yoga (Jupiter) → "the Guru Yoga"
-  Meaning: natural teacher and advisor; people come for wisdom before the title is officially earned; favors education, law, medicine, consulting, advisory roles.
-
-Ruchaka Yoga (Mars) → "the Warrior's Yoga"
-  Meaning: extraordinary drive; pushes through obstacles that stop others; natural instinct for competition; found in athletes, military, surgeons, entrepreneurs who win by force of will.
-
-Malavya Yoga (Venus) → "the Grace Yoga"
-  Meaning: magnetic personal charm, refined aesthetic sense; creates beauty and harmony in any field; success in creative fields, luxury, hospitality, arts, any career where human connection matters.
-
-Budh Aditya Yoga → "the Sharp Mind Yoga"
-  Meaning: both intelligent AND articulate — thinks clearly AND expresses in ways that persuade; favors communication, strategy, law, writing, teaching, any field where words are currency.
-
-Chandra Mangal Yoga → "the Wealth Activator Yoga"
-  Meaning: powerful financial instinct; drive to build and accumulate; money flows more naturally; strong in roles combining emotion with action — sales, entrepreneurship, real estate.
-
-Neecha Bhanga Raj Yoga → "the Phoenix Yoga"
-  Meaning: transforms apparent disadvantage into unexpected strength; those counted out early who rose further than anyone predicted; setbacks become launchpads.
-
-Viparita Raj Yoga → "the Hidden Victory Yoga"
-  Meaning: produces success through circumstances that look like loss to others; greatest career breakthroughs often come AFTER a setback or change in direction.
-
-═══════════════════════════════════
 OUTPUT FORMAT — WRAP EACH SECTION IN THESE EXACT TAGS:
 ═══════════════════════════════════
 
 <identity>
 4-5 sentences. Open by naming their Lagna sign and what it specifically means for professional personality (be precise — not generic). Example for Aries rising: "You were born under Aries rising — the Lagna of pioneers, initiators, and people who are meant to START things, not maintain them. Your professional energy is fastest at the beginning of projects, in new ventures, in roles where someone needs to take the first bold step." Then 1-2 sentences about their Moon sign and what emotional energy drives their work and ambition. End with exactly: "That quiet inner sense that you are meant for something significant — that is not ego. That is your chart speaking."
 </identity>
-
-<rajyogas>
-8-10 sentences — THE CENTERPIECE OF THE READING. Open: "After carefully reading your birth chart, I found [NUMBER] significant Raj Yogas — powerful planetary combinations that Vedic astrology associates with above-average career success, recognition, and influence." Then for EACH yoga present: "[Sanskrit Name] — what masters call [Plain Translation] — is present in your chart. [2-3 sentences of its REAL career meaning — specific, vivid, not generic.]" After naming all yogas: "Having [NUMBER] of these yogas in a single chart is genuinely uncommon. Most people have one, if any. The fact that yours has [NUMBER] tells me this chart belongs to someone with real potential for above-average career achievement — not someday, but within the arc of the years ahead." End with the activation hook: "Here is what most people never learn: every Raj Yoga has a dormant state and an active state. The activation requires a specific combination of gemstone, mantra, timing, and in some cases a simple ritual — all precisely calibrated to YOUR chart, not a generic prescription. Your full CareerJyotish Report contains the exact activation protocol for each of your Raj Yogas — what to do, what to wear, what to chant, and when to begin. This is the section that changes things."
-</rajyogas>
 
 <strengths>
 4-5 sentences. Based on the dominant planet (strongest dignity or career karaka position): name the planet and its natural career domain in plain language. Example: "Your chart is strongly influenced by Saturn — the planet of discipline, systems, and long-term building. This makes you naturally suited to careers that reward patience, structure, and reliability: engineering, law, administration, finance, or any field where serious people do serious work." Then add 1-2 sentences about a specific hidden professional strength from this planet's placement (translate to plain language — no house numbers).
@@ -1139,11 +1105,11 @@ OUTPUT FORMAT — WRAP EACH SECTION IN THESE EXACT TAGS:
 }}
 </teasers>
 
-TOTAL LENGTH: 580-640 words across all 8 sections. Every sentence must feel specific to THIS chart, not a template.
+TOTAL LENGTH: 500-560 words across all 7 sections. Every sentence must feel specific to THIS chart, not a template.
 """
 
 
-_PREDICTION_SECTIONS = ['identity', 'rajyogas', 'strengths', 'currentperiod', 'prediction', 'health', 'relationships', 'bridge']
+_PREDICTION_SECTIONS = ['identity', 'strengths', 'currentperiod', 'prediction', 'health', 'relationships', 'bridge']
 
 
 def parse_prediction(raw: str) -> tuple[dict, dict]:

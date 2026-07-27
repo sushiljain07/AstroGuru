@@ -51,6 +51,104 @@ CAREER_DOMAINS = {
     "Ketu":    ["Spirituality", "Healing", "Occult sciences", "Research"],
 }
 
+# Broader, realistic job-title keywords per planet — used only by
+# compute_career_alignment() to deterministically match free-text
+# professions against a planet. Deliberately more granular than
+# CAREER_DOMAINS above (which is terse labels for prompt context, not
+# built for substring-matching real job titles).
+PROFESSION_KEYWORDS = {
+    "Sun":     ["government", "civil service", "administration", "politician", "politics",
+                "doctor", "physician", "medicine", "ceo", "director", "executive", "leadership"],
+    "Moon":    ["nurse", "nursing", "hospitality", "hotel", "restaurant", "food", "dairy",
+                "caregiver", "public service", "social worker", "counselor", "psychology"],
+    "Mars":    ["military", "army", "mechanical engineer", "civil engineer", "structural engineer",
+                "surgeon", "surgery", "sports", "athlete", "real estate", "police", "mechanic",
+                "construction", "firefighter"],
+    "Mercury": ["finance", "accountant", "accounting", "writer", "writing", "journalist",
+                "communications", "marketing", "software", "developer", "programmer",
+                "data analyst", "analyst", "it "],
+    "Jupiter": ["teacher", "professor", "education", "lawyer", "law", "legal", "judge",
+                "priest", "religious", "consultant", "consulting", "researcher",
+                "philosophy", "advisor"],
+    "Venus":   ["artist", "art", "designer", "design", "musician", "music", "fashion",
+                "stylist", "beauty", "entertainment", "actor", "actress"],
+    "Saturn":  ["mining", "manufacturing", "factory", "agriculture", "farmer",
+                "social work", "labor", "industrial", "architect"],
+    "Rahu":    ["technology", "tech", "data scientist", "artificial intelligence",
+                "machine learning", "foreign", "aviation", "pilot", "media", "film"],
+    "Ketu":    ["spiritual", "healer", "healing", "alternative medicine", "astrology", "occult"],
+}
+
+
+def compute_career_alignment(current_profession, ak_data, planets, lagna_idx):
+    """
+    Deterministic (not LLM) alignment label between a free-text current
+    profession and the chart's Amatyakaraka — keyword-matching only, so the
+    output is reproducible for the same inputs. Per the blueprint's own
+    quality rule ("do not use a score unless its methodology is deterministic
+    and consistent"), this returns a 3-way qualitative label, not a fake
+    numeric score — free-text matching can't honestly support real 0-100
+    precision. Returns None if no profession was given (nothing to assess).
+    """
+    if not current_profession or not current_profession.strip():
+        return None
+
+    text = current_profession.lower()
+    amk_planet = (ak_data.get("amatyakaraka") or {}).get("name")
+
+    # Collect every planet's match count, then break ties in favor of the
+    # Amatyakaraka when it's among the tied planets — e.g. "Software
+    # Engineer" ties Mercury (software) and Mars (mechanical engineer)
+    # style keywords equally; if the chart's AMK is Mercury, that's the
+    # more meaningful read than an arbitrary dict-order tiebreak.
+    counts = {
+        planet: [kw for kw in keywords if kw in text]
+        for planet, keywords in PROFESSION_KEYWORDS.items()
+    }
+    max_count = max((len(v) for v in counts.values()), default=0)
+    tied = [p for p, kws in counts.items() if len(kws) == max_count and max_count > 0]
+
+    best_planet, best_keywords = None, []
+    if tied:
+        best_planet = amk_planet if amk_planet in tied else tied[0]
+        best_keywords = counts[best_planet]
+
+    if best_planet is None:
+        return {
+            "label": "Underutilized Potential",
+            "amk_planet": amk_planet or "?",
+            "matched_keywords": [],
+            "explanation": (
+                f"Your stated profession doesn't obviously map to a classical career domain, but your "
+                f"chart's strongest career signal (Amatyakaraka: {amk_planet or '?'}) points toward real, "
+                f"specific strengths — this report explores what that potential looks like."
+            ),
+        }
+
+    if best_planet == amk_planet:
+        label = "Strong Alignment"
+        explanation = (
+            f"Your stated profession matches keywords ({', '.join(best_keywords)}) tied to {best_planet} — "
+            f"which is also your chart's Amatyakaraka, its strongest career signal. Your current path draws "
+            f"directly on your chart's core strength."
+        )
+    else:
+        label = "Partial Alignment"
+        explanation = (
+            f"Your stated profession matches keywords ({', '.join(best_keywords)}) tied to {best_planet}, "
+            f"but your chart's strongest career signal (Amatyakaraka) is {amk_planet or '?'}. Your current "
+            f"path draws on real strengths — this report also explores the potential your {amk_planet or '?'} "
+            f"energy points toward."
+        )
+
+    return {
+        "label": label,
+        "amk_planet": amk_planet or "?",
+        "matched_keywords": best_keywords,
+        "explanation": explanation,
+    }
+
+
 # ── Utility Helpers ───────────────────────────────────────────────────────────
 
 # ── 3. Job vs Business ────────────────────────────────────────────────────────
@@ -707,6 +805,33 @@ def analyze_d10(d10_chart: dict) -> dict:
     }
 
 
+def analyze_d2(d2_chart: dict) -> dict:
+    """
+    Lightweight Hora (D2) read for the Money & Career section — just enough
+    context to ground a wealth-style paragraph, not a full parallel analysis
+    like analyze_d10(). Per the blueprint: "use D2 selectively."
+    """
+    planets   = d2_chart.get("planets", [])
+    lagna     = d2_chart.get("ascendant", {})
+    lagna_idx = lagna.get("sign_index", 0)
+
+    def _desc(name: str) -> str:
+        p = _planet_by_name(planets, name)
+        if not p:
+            return f"{name}: not found in D2"
+        dignity = get_planet_dignity(name, p["sign_index"])
+        return f"{name} in {p['sign']} (H{p['house']}, {dignity})"
+
+    lord_2  = _house_lord(lagna_idx, 2)
+    lord_11 = _house_lord(lagna_idx, 11)
+
+    return {
+        "lagna": lagna.get("sign", "Unknown"),
+        "second_lord_placement": _desc(lord_2),
+        "eleventh_lord_placement": _desc(lord_11),
+    }
+
+
 # ── 6. Career Field Identification ───────────────────────────────────────────
 
 def identify_career_fields(
@@ -796,6 +921,10 @@ def _build_career_prompt(
     transit_data: Optional[dict] = None,
     gemstone_context: str = "",
     language: str = "en",
+    career_stage: Optional[str] = None,
+    current_profession: Optional[str] = None,
+    career_concerns: Optional[list] = None,
+    d2_data: Optional[dict] = None,
 ) -> str:
     lagna     = chart_data.get("ascendant", {})
     planets   = chart_data.get("planets", [])
@@ -932,36 +1061,31 @@ def _build_career_prompt(
         (p["sign"] + " H" + str(p["house"]) for p in planets if p["name"] == tenth_lord), "N/A"
     )
 
-    # Active yogas for career report (present only)
-    active_yoga_names = [y["yoga"] for y in active]
-    active_yoga_list  = "\n".join(
+    # Active yogas for career report (present only) — full detail lives in the
+    # dedicated Rajyogas tab (RajyogasTab.jsx, backed by check_all_yogas());
+    # here they're prompt context only, not a report section of their own.
+    active_yoga_list = "\n".join(
         f"  - {y['yoga']}: {y['description']}" for y in active
     ) or "  None active"
 
-    # Rajyogas instruction for career report — includes activation procedure
-    if active:
-        _yoga_names_str = ", ".join(active_yoga_names)
-        _rajyoga_instruction = (
-            f"The following Rajyogas are ACTIVE in this chart: {_yoga_names_str}. "
-            "For EACH active yoga listed above, write THREE things: "
-            "(1) State the yoga name boldly and explain in 1 sentence exactly how it manifests in this person's professional life. "
-            "(2) ACTIVATION PROCEDURE — write the specific mantra for the ruling planet of this yoga "
-            "(give the full Sanskrit mantra text, e.g. 'Om Gurave Namah' for Jupiter yogas), "
-            "how many times to chant it, and on which day of the week. "
-            "(3) One simple home ritual to strengthen this yoga (lighting a ghee lamp, offering flowers, fasting — "
-            "be specific to the planet ruling this yoga). "
-            "Format each yoga as: 'Yoga Name: [career meaning]. Activation: [mantra text] — chant [N] times every [day] at [time]. "
-            "Ritual: [specific action].' "
-            "Do NOT mention any absent yogas. End with an empowering statement about their combined yogic potential."
-        )
-    else:
-        _rajyoga_instruction = (
-            "No classical Rajyogas are detected in this chart. Write 2 short encouraging sentences "
-            "about how excellent planetary positions and combinations outside classical yogas still "
-            "bring outstanding career success — and mention one specific strength visible in this chart. "
-            "Then give ONE simple planetary mantra and ritual based on the strongest planet in this chart "
-            "to amplify career success. End with one empowering statement."
-        )
+    # User's current career context (career stage / profession / concerns) —
+    # optional, captured lazily in CareerReportTab and skippable. Framed as
+    # context, never as astrological evidence — see the guardrail below.
+    _career_context_block = ""
+    if career_stage or current_profession or career_concerns:
+        concerns_str = ", ".join(career_concerns) if career_concerns else "not specified"
+        _career_context_block = f"""
+━━━ USER'S CURRENT CAREER CONTEXT (for framing only) ━━━
+  Career stage: {career_stage or 'not specified'}
+  Current profession: {current_profession or 'not specified'}
+  What they specifically want to know: {concerns_str}
+
+  IMPORTANT — CONTEXT, NOT EVIDENCE: their current profession is background only, not astrological proof of fit.
+  Do NOT simply affirm whatever they currently do. Compare it against the chart-derived strengths above and
+  explicitly note whether their current path shows strong alignment, partial alignment, or underutilized
+  potential. Let career_destiny_brief, natural_strengths, best_career_path, job_vs_business_verdict, and
+  current_phase speak to their stated concern(s) above wherever relevant, without inventing a new section.
+"""
 
     # Conditional academic section — only for users under 25
     if user_age < 25:
@@ -1047,10 +1171,15 @@ D10 DASAMSA CHART:
   Saturn in D10: {d10_data['saturn']}
   10th lord D10: {d10_data['tenth_lord']}
   Strength: {d10_data['strength_note']}
-
+{f'''
+D2 HORA CHART (wealth context — use selectively, only for the Money section):
+  D2 Lagna = {d2_data['lagna']}
+  2nd lord in D2: {d2_data['second_lord_placement']}
+  11th lord in D2: {d2_data['eleventh_lord_placement']}
+''' if d2_data else ''}
 ACTIVE CAREER YOGAS (PRESENT IN THIS CHART):
 {active_yoga_list}
-
+{_career_context_block}
 PLACEMENT COMBINATIONS TRIGGERED:
 {chr(10).join('  '+c for c in combos_notes)}
 
@@ -1096,10 +1225,6 @@ Sections must appear in this EXACT order.
     "title": "Job vs Business — What Your Chart Says",
     "content": "Give a CLEAR, DEFINITIVE verdict first: either 'Your chart strongly favors [employment/building your own venture]' or 'Your chart is balanced between both paths.' The verdict is: {career_mode}. Then explain WHY in 3-4 sentences — cite the D10 6th lord score ({d10_job_score}) vs 7th lord score ({d10_biz_score}), what this means about their natural working style, and what specific type of role or venture structure will serve them best. Be warm and direct — this is one of the most important questions in career astrology and they deserve a real answer. End with: 'This week, [one concrete action aligned with this verdict].'"
   }},
-  "career_rajyogas": {{
-    "title": "Rajyogas Blessing Your Career",
-    "content": "{_rajyoga_instruction}"
-  }},
   "peak_career_window": {{
     "title": "Your Peak Career Window",
     "content": "4–5 sentences. Using ONLY the future dashas listed above (from {current_year} onward): identify the single best upcoming dasha period for peak career success. Open with: 'Between [YEAR]–[YEAR], you will enter your most powerful career phase...' Explain WHY that dasha planet connects to career houses in this chart. Then mention what the current {md_planet} dasha is building toward. NEVER reference any dasha that ended before {current_year}. End with: 'This week, [one action to prepare for this window].'"
@@ -1107,6 +1232,18 @@ Sections must appear in this EXACT order.
   "current_phase": {{
     "title": "What To Do Right Now",
     "content": "4–5 sentences. Based on current {md_planet}/{ad_planet} dasha and transits: give 3–4 specific, actionable steps for the next 12 months. Frame every step as an OPPORTUNITY. Use 'This is an excellent time to...' or 'Your chart now favors...' language. End with an encouraging sentence about the momentum building right now."
+  }},
+  "career_growth": {{
+    "title": "Your Growth Trajectory",
+    "content": "4–5 sentences on growth trajectory: promotion/recognition themes, how authority and responsibility are likely to expand, and what their career ceiling looks like — framed as 'your next level' rather than a limit. State a clear preferred move (vertical promotion, lateral move, stepping into leadership, or deep specialization) based on AMK {amaty_name}, D10 strength ({d10_data['strength_label']}), and active yogas. End with: 'This week, [one concrete action toward this growth path].'"
+  }},
+  "career_money": {{
+    "title": "Money & Career",
+    "content": "4–5 sentences on income growth potential and wealth accumulation style (stable, structured income vs. variable/entrepreneurial income) — use the D2 Hora context above selectively where it adds real signal, otherwise ground this in AMK {amaty_name} and career mode ({career_mode}). If {career_mode} favors business, mention business income potential. NEVER promise an exact salary figure or guaranteed wealth amount — describe potential and style, not numbers. End with: 'This week, [one concrete action toward financial growth].'"
+  }},
+  "career_challenges": {{
+    "title": "What To Watch For",
+    "content": "3–4 sentences identifying 1–2 genuine growth edges, framed ONLY as 'an area to stay mindful of' or 'a pattern worth watching' — NEVER as a risk, danger, or warning, and NEVER using any of the forbidden words above. Tie each to a specific upcoming dasha or transit window (from the future dashas or transits above) so it feels concrete, not generic. End with ONE constructive, encouraging action to navigate it well."
   }},
 {_academic_json}{_gemstone_section}  "empowering_remedies": {{
     "title": "Empowering Remedies",
@@ -1147,7 +1284,16 @@ Sections must appear in this EXACT order.
       "effort_required": "medium",
       "timeline": "YYYY–YYYY"
     }}
-  ]
+  ],
+  "career_roadmap": {{
+    "now": "1–2 sentences on the single active theme/focus right now, grounded in the current {md_planet}/{ad_planet} dasha.",
+    "next_12_months": "1–2 sentences on the top opportunity and one thing worth pacing carefully in the coming year.",
+    "years_1_to_3": "1–2 sentences on career direction, promotion, or leadership themes over this horizon, using the future dashas above.",
+    "years_3_to_5": "1–2 sentences on long-term positioning, seniority, or a possible second-career theme.",
+    "top_actions": ["Specific action 1", "Specific action 2", "Specific action 3"],
+    "top_avoid": ["One thing to avoid 1 — framed constructively, not as a warning", "2", "3"],
+    "next_question": "One natural follow-up question this person might want to ask next, phrased in their own voice (e.g. 'Should I ask for a promotion this year?')."
+  }}
 }}"""
     return prompt
 
@@ -1168,6 +1314,10 @@ def generate_career_report(
     birth_date: Optional[str] = None,
     gemstone_context: str = "",
     language: str = "en",
+    career_stage: Optional[str] = None,
+    current_profession: Optional[str] = None,
+    career_concerns: Optional[list] = None,
+    d2_chart: Optional[dict] = None,
 ) -> dict:
     """
     Orchestrate all analysis steps and return a structured career report.
@@ -1192,8 +1342,12 @@ def generate_career_report(
 
     ak_data      = calculate_amatyakaraka(planets)
     jvb          = determine_job_vs_business(planets, lagna_idx, d10_chart=d10_chart)
-    combinations = check_special_combinations(planets, lagna_idx)
+    # Full 19-yoga set (not just the 12 from check_special_combinations) so
+    # this report agrees with the Rajyogas tab and the free Reading tab,
+    # which both already use check_all_yogas().
+    combinations = check_all_yogas(planets, lagna_idx)
     d10_data     = analyze_d10(d10_chart)
+    d2_data      = analyze_d2(d2_chart) if d2_chart else None
     fields       = identify_career_fields(planets, lagna_idx, ak_data)
 
     # ── Pre-compute D10 Bootcamp extra factors ────────────────────────────────
@@ -1239,6 +1393,10 @@ def generate_career_report(
         transit_data=transit_data,
         gemstone_context=gemstone_context,
         language=language,
+        career_stage=career_stage,
+        current_profession=current_profession,
+        career_concerns=career_concerns,
+        d2_data=d2_data,
     )
 
     raw, provider = _call_llm(prompt, system=system, groq_extra=groq_gemstone_excerpt)
@@ -1249,10 +1407,11 @@ def generate_career_report(
         # New v2 sections
         "career_destiny_brief", "natural_strengths", "best_career_path",
         "job_vs_business_verdict",
-        "career_rajyogas", "peak_career_window", "current_phase", "academic_path",
+        "peak_career_window", "current_phase", "career_growth", "career_money", "career_challenges",
+        "academic_path",
         "gemstone_recommendation", "rudraksha_recommendation", "empowering_remedies", "closing_blessing",
         # Legacy sections (kept for backward compatibility)
-        "lagna_personality", "job_vs_business", "tenth_house_d1", "d10_analysis",
+        "career_rajyogas", "lagna_personality", "job_vs_business", "tenth_house_d1", "d10_analysis",
         "amatyakaraka", "career_fields", "student_streams", "yogas_combinations",
         "dasha_predictions", "remedies", "conclusion", "transit_impact",
         "single_best_career",
@@ -1285,6 +1444,71 @@ def generate_career_report(
                     "timeline":        opt.get("timeline", ""),
                 })
     report["career_options"] = parsed_options
+
+    # ── Parse career_roadmap (structured, not prose) ──────────────────────────
+    raw_roadmap = raw.get("career_roadmap")
+    if isinstance(raw_roadmap, dict):
+        report["career_roadmap"] = {
+            "now":            raw_roadmap.get("now", ""),
+            "next_12_months": raw_roadmap.get("next_12_months", ""),
+            "years_1_to_3":   raw_roadmap.get("years_1_to_3", ""),
+            "years_3_to_5":   raw_roadmap.get("years_3_to_5", ""),
+            "top_actions":    raw_roadmap.get("top_actions", []) or [],
+            "top_avoid":      raw_roadmap.get("top_avoid", []) or [],
+            "next_question":  raw_roadmap.get("next_question", ""),
+        }
+    else:
+        report["career_roadmap"] = None
+
     report["llm_provider"] = provider
+    # Deterministic — matches the Rajyogas tab and free Reading tab exactly,
+    # since all three now read from the same check_all_yogas() call.
+    report["active_yogas"] = [
+        {"name": y["yoga"], "description": y["description"]}
+        for y in combinations if y["present"]
+    ]
+
+    # ── Astrological Evidence — purely surfacing data already computed
+    # above for the LLM prompt; no new computation, no LLM involvement.
+    # Powers the report's "show your work" technical drill-down.
+    amaty        = ak_data.get("amatyakaraka") or {}
+    moon_p       = _planet_by_name(planets, "Moon")
+    sun_p        = _planet_by_name(planets, "Sun")
+    tenth_lord   = _house_lord(lagna_idx, 10)
+    tenth_lord_p = _planet_by_name(planets, tenth_lord)
+    md = dasha.get("current_mahadasha") or {}
+    ad = dasha.get("current_antardasha") or {}
+    report["astrological_evidence"] = {
+        "lagna": chart_data.get("ascendant", {}).get("sign", "?"),
+        "moon_sign": moon_p["sign"] if moon_p else "?",
+        "sun_sign": sun_p["sign"] if sun_p else "?",
+        "amatyakaraka": amaty.get("name", "N/A"),
+        "amatyakaraka_placement": f"{amaty.get('sign', '?')} H{amaty.get('house', '?')}",
+        "tenth_lord": tenth_lord,
+        "tenth_lord_placement": f"{tenth_lord_p['sign']} H{tenth_lord_p['house']}" if tenth_lord_p else "N/A",
+        "d10_lagna": d10_data.get("lagna", "?"),
+        "d10_job_score": jvb["d10_lord6"].get("score", 0),
+        "d10_business_score": jvb["d10_lord7"].get("score", 0),
+        "current_mahadasha": md.get("planet", "?"),
+        "current_mahadasha_end": md.get("end", "?"),
+        "current_antardasha": ad.get("planet", "N/A"),
+        # Full planet-by-planet table — same data already computed for the
+        # prompt's planet_lines, just also surfaced to the frontend.
+        "all_planets": [
+            {
+                "name": p["name"],
+                "sign": p["sign"],
+                "house": p.get("house"),
+                "dignity": get_planet_dignity(p["name"], p["sign_index"]),
+                "retrograde": bool(p.get("retrograde")),
+            }
+            for p in planets
+        ],
+    }
+
+    # Deterministic — not LLM. See compute_career_alignment()'s docstring.
+    report["career_alignment"] = compute_career_alignment(
+        current_profession, ak_data, planets, lagna_idx
+    )
 
     return report
