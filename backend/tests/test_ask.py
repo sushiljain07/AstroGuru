@@ -64,13 +64,13 @@ def test_ask_invalid_place_returns_400():
 
 
 def test_ask_no_key_returns_503():
-    # Today's failover order (see services/ai.py's _call_llm) tries Claude
-    # first (OPENROUTER_API_KEY or ANTHROPIC_API_KEY), then falls back to
-    # Groq (GROQ_API_KEY), only raising 503 once *both* are unavailable.
-    # This test previously cleared only GROQ_API_KEY, which matched an
-    # earlier Groq-primary architecture (see PROGRESS.md) but not the
-    # current one — clearing just Groq while a real Claude key is present
-    # in the environment would actually still succeed via Claude, not 503.
+    # Today's failover order (see services/ai.py's _call_llm) tries
+    # OpenRouter, then Claude (direct via ANTHROPIC_API_KEY), then Groq —
+    # only raising 503 once *all three* are unavailable. This test
+    # previously cleared only GROQ_API_KEY, which matched an earlier
+    # Groq-primary architecture (see PROGRESS.md) but not the current one —
+    # clearing just Groq while a real key for any earlier provider is present
+    # in the environment would actually still succeed, not 503.
     keys_to_clear = ["OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY"]
     originals = {k: os.environ.get(k) for k in keys_to_clear}
     for k in keys_to_clear:

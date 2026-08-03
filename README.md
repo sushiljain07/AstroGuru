@@ -67,7 +67,7 @@ Learn (/learn)
 | **Astrology** | pyswisseph (Swiss Ephemeris C binding) |
 | **Database** | PostgreSQL, SQLAlchemy 2.x, Alembic (8 migrations) |
 | **Auth** | Phone OTP (MSG91 / 2Factor) + Google OAuth, JWT + rotating httpOnly refresh tokens |
-| **AI** | Claude (Sonnet via OpenRouter) primary, Groq/Llama fallback |
+| **AI** | OpenRouter (configurable model, defaults to a free tier) primary, Claude direct fallback, Groq/Llama final fallback |
 | **Deployment** | Frontend → Vercel, Backend → Railway |
 | **Monitoring** | Sentry (frontend + backend, opt-in via env var) |
 | **Security** | CSP, HSTS, X-Frame-Options, slowapi rate limiting |
@@ -91,7 +91,7 @@ Learn (/learn)
 
 ## AI Features
 
-- **AI Reading** — full narrative chart reading (Claude Sonnet via OpenRouter, Groq fallback). Prompts grounded in `astro-skills/` reference library (~1.1 MB covering career, gemstones, marriage, nakshatra, houses, planets, numerology, children)
+- **AI Reading** — full narrative chart reading (OpenRouter primary, Claude direct then Groq fallback). Prompts grounded in `astro-skills/` reference library (~1.1 MB covering career, gemstones, marriage, nakshatra, houses, planets, numerology, children)
 - **Ask AI** — up to 10 chart-specific Q&A per session, with suggested starter questions
 - **Career Report** — dedicated D10 + Dasha + Rajyoga analysis (English or Hindi)
 - **Topic snapshots** — inline career / relationship / health / wealth derivations on the home dashboard (no extra API call — derived from chart data already fetched)
@@ -220,8 +220,10 @@ uvicorn main:app --reload     # http://localhost:8000
 DATABASE_URL=postgresql://user:pass@localhost:5432/starjyotish
 JWT_SECRET_KEY=<64-char random hex>
 COOKIE_SECURE=false           # true in production
-OPENROUTER_API_KEY=           # for AI readings
-GROQ_API_KEY=                 # fallback LLM
+OPENROUTER_API_KEY=           # primary LLM
+OPENROUTER_MODEL=             # model OpenRouter is asked for — defaults to a free-tier model
+ANTHROPIC_API_KEY=            # 1st fallback (direct Claude)
+GROQ_API_KEY=                 # final fallback LLM
 GOOGLE_CLIENT_ID=             # for Google OAuth
 RESEND_API_KEY=               # for email OTP
 SENTRY_DSN=                   # optional

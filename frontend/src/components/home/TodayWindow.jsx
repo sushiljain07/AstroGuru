@@ -146,6 +146,16 @@ export default function TodayWindow({ panchang }) {
         </p>
       )}
 
+      <p className="text-sm text-ink-onnight/60 mt-1.5">
+        {t('home_window_avoid', {
+          defaultValue: 'Avoid: {{start}} – {{end}}',
+          start: minutesToLabel(rahuStart),
+          end: minutesToLabel(rahuEnd),
+        })}
+        {' — '}
+        {t('home_window_avoid_hint', "Rahu Kaal, skip new starts here.")}
+      </p>
+
       {hasSummary && (
         <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 mt-4 pt-4 border-t border-white/[0.08]">
           <PanchangCell label={t('panchang_tithi', 'Tithi')} value={tithiName} />

@@ -157,7 +157,7 @@ def test_reading_response_fields():
 def test_reading_missing_key_returns_503():
     with patch("services.chart_context.geocode_place", return_value=_geo()), \
          patch("routes.kundli.generate_reading",
-               side_effect=HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")):
+               side_effect=HTTPException(status_code=503, detail="No LLM provider configured")):
         resp = client.post("/api/kundli/reading", json=BODY)
     assert resp.status_code == 503
 
