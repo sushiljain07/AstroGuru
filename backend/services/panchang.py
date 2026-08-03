@@ -40,32 +40,35 @@ TITHI_NAMES = [
 ]
 
 # Hindu lunar month (Chandramasa) names — derived from Sun's sidereal rashi
-# (Purnimanta system used across North India/Chhattisgarh):
-#   Sun in sidereal Mesha  (0–30°)   → Chaitra
-#   Sun in sidereal Vrishabha (30–60°) → Vaishakh  … and so on.
+# (Purnimanta system used across North India/Chhattisgarh). The month named
+# for a rashi is the one the Sun transits *before* entering it — e.g. Chaitra
+# is the month during which the Sun is in Meena, ending when the Sun enters
+# Mesha (Baisakhi):
+#   Sun in sidereal Meena  (330–360°) → Chaitra
+#   Sun in sidereal Mesha  (0–30°)    → Vaishakh  … and so on.
 # This is the solar-based approximation; a strict Purnimanta derivation
 # would use the Nakshatra where Purnima falls, but Sun-rashi gives the
 # correct month name in ≥98% of cases and never requires a full-month
 # ephemeris scan.
 MASA_NAMES = [
-    "Chaitra",      # Sun in Mesha      (0–30°)
-    "Vaishakh",     # Sun in Vrishabha  (30–60°)
-    "Jyeshtha",     # Sun in Mithuna    (60–90°)
-    "Ashadha",      # Sun in Karka      (90–120°)
-    "Shravan",      # Sun in Simha      (120–150°)
-    "Bhadrapad",    # Sun in Kanya      (150–180°)
-    "Ashwin",       # Sun in Tula       (180–210°)
-    "Kartik",       # Sun in Vrischika  (210–240°)
-    "Margashirsha", # Sun in Dhanu      (240–270°)
-    "Paush",        # Sun in Makar      (270–300°)
-    "Magh",         # Sun in Kumbha     (300–330°)
-    "Phalgun",      # Sun in Meena      (330–360°)
+    "Chaitra",      # Sun in Meena      (330–360°)
+    "Vaishakh",     # Sun in Mesha      (0–30°)
+    "Jyeshtha",     # Sun in Vrishabha  (30–60°)
+    "Ashadha",      # Sun in Mithuna    (60–90°)
+    "Shravan",      # Sun in Karka      (90–120°)
+    "Bhadrapad",    # Sun in Simha      (120–150°)
+    "Ashwin",       # Sun in Kanya      (150–180°)
+    "Kartik",       # Sun in Tula       (180–210°)
+    "Margashirsha", # Sun in Vrischika  (210–240°)
+    "Paush",        # Sun in Dhanu      (240–270°)
+    "Magh",         # Sun in Makar      (270–300°)
+    "Phalgun",      # Sun in Kumbha     (300–330°)
 ]
 
 
 def _hindu_masa(sun_lon: float) -> str:
     """Return the Chandramasa name for the given sidereal Sun longitude."""
-    return MASA_NAMES[int(sun_lon / 30) % 12]
+    return MASA_NAMES[(int(sun_lon / 30) + 1) % 12]
 
 
 YOGA_NAMES = [

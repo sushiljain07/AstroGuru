@@ -29,92 +29,72 @@ def extract_json(raw: str) -> dict:
     raise ValueError(f"No valid JSON found in response (first 300 chars): {raw[:300]}")
 
 
-def call_llm(
-    prompt: str,
-    system: str = "",
-    groq_extra: str = "",
-    groq_system_prompt: str = "",
-    groq_extra_header: str = "## ADDITIONAL CONTEXT",
-    log_prefix: str = "report",
-) -> tuple[dict, str]:
-    """
-    Always try Claude first. Only fall back to Groq on network/API-level errors.
-    `groq_system_prompt` is the compact, topic-specific system prompt Groq
-    receives (to avoid 413 Payload Too Large) — callers pass their own
-    (e.g. skill_loader.GROQ_SYSTEM_PROMPT for career). `groq_extra` is a
-    small, separately-bounded supplement appended on top of it under
-    `groq_extra_header` (e.g. a single ascendant's gemstone excerpt, not the
-    full skills bundle Claude gets). `log_prefix` tags console fallback logs
-    by topic.
-    Returns (parsed_json, provider_label) — provider_label reflects whichever
-    one actually served this request, since the fallback can kick in silently.
-    """
-    openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    anthropic_key  = os.getenv("ANTHROPIC_API_KEY", "").strip()
+# Model OpenRouter is asked for — set via OPENROUTER_MODEL so switching
+# models is a config change, not a code change (see services/ai.py, which
+# shares this same env var). Defaults to a $0/M-token free model.
+_OPENROUTER_MODEL = (os.getenv("OPENROUTER_MODEL") or "openai/gpt-oss-20b:free").strip()
 
-    if openrouter_key:
-        try:
-            or_messages = ([{"role": "system", "content": system}] if system else []) + \
-                          [{"role": "user", "content": prompt}]
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openrouter_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://starjyotish.app"),
-                    "X-Title": os.getenv("OPENROUTER_SITE_NAME", "Star Jyotish"),
-                },
-                json={
-                    "model": "anthropic/claude-sonnet-4-5",
-                    "max_tokens": 7000,
-                    "messages": or_messages,
-                },
-                timeout=90,
-            )
-            if resp.status_code in (402, 403):
-                try:
-                    detail = resp.json().get("error", {}).get("message", resp.text[:200])
-                except Exception:
-                    detail = resp.text[:200]
-                logger.warning("[%s] OpenRouter %s (%s) — falling back to Groq.", log_prefix, resp.status_code, detail)
-            else:
-                resp.raise_for_status()
-                text = resp.json()["choices"][0]["message"]["content"]
-                return extract_json(text), "Claude"
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Claude (via OpenRouter) returned non-JSON: {e}") from e
-        except Exception as e:
-            logger.warning("[%s] Claude via OpenRouter error (%s: %s), falling back to Groq.", log_prefix, type(e).__name__, e)
-        # fall through to Groq
-    elif anthropic_key:
-        import anthropic as _anthropic
-        client = _anthropic.Anthropic(api_key=anthropic_key)
-        create_kwargs: dict = dict(
-            model="claude-sonnet-4-6",
-            max_tokens=7000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        if system:
-            create_kwargs["system"] = system
-        try:
-            msg = client.messages.create(**create_kwargs)
-            return extract_json(msg.content[0].text), "Claude"
-        except _anthropic.APIStatusError as e:
-            logger.warning("[%s] Claude API error (%s), falling back to Groq.", log_prefix, e.status_code)
-        except _anthropic.APIConnectionError:
-            logger.warning("[%s] Claude connection error, falling back to Groq.", log_prefix)
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Claude returned non-JSON: {e}") from e
-        except Exception as e:
-            logger.warning("[%s] Claude unexpected error (%s: %s), falling back to Groq.", log_prefix, type(e).__name__, e)
 
+def _call_openrouter(prompt: str, system: str) -> str:
+    """Call _OPENROUTER_MODEL via OpenRouter using OPENROUTER_API_KEY."""
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not set")
+    or_messages = ([{"role": "system", "content": system}] if system else []) + \
+                  [{"role": "user", "content": prompt}]
+    resp = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "https://starjyotish.app"),
+            "X-Title": os.getenv("OPENROUTER_SITE_NAME", "Star Jyotish"),
+        },
+        json={
+            "model": _OPENROUTER_MODEL,
+            "max_tokens": 7000,
+            "messages": or_messages,
+            "response_format": {"type": "json_object"},
+        },
+        timeout=90,
+    )
+    if resp.status_code in (402, 403):
+        try:
+            detail = resp.json().get("error", {}).get("message", resp.text[:200])
+        except Exception:
+            detail = resp.text[:200]
+        raise RuntimeError(f"OpenRouter {resp.status_code}: {detail}")
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _call_claude_direct(prompt: str, system: str) -> str:
+    """Call Claude directly via the Anthropic SDK using ANTHROPIC_API_KEY."""
+    import anthropic as _anthropic
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set")
+    client = _anthropic.Anthropic(api_key=api_key)
+    create_kwargs: dict = dict(
+        model="claude-sonnet-4-6",
+        max_tokens=7000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if system:
+        create_kwargs["system"] = system
+    msg = client.messages.create(**create_kwargs)
+    return msg.content[0].text
+
+
+def _call_groq(prompt: str, groq_system_prompt: str, groq_extra: str, groq_extra_header: str) -> str:
+    """Call Groq/Llama with retry on 429, using the compact topic-specific system prompt."""
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
     if not groq_key:
-        raise RuntimeError("No LLM API key available (set OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or GROQ_API_KEY).")
-
+        raise ValueError("GROQ_API_KEY not set")
     groq_system = groq_system_prompt
     if groq_extra:
         groq_system = groq_system + f"\n\n{groq_extra_header}\n" + groq_extra
+    last_exc: Exception = RuntimeError("no attempts made")
     for attempt in range(3):
         try:
             resp = requests.post(
@@ -132,14 +112,68 @@ def call_llm(
                 timeout=90,
             )
             if resp.status_code == 429:
+                last_exc = RuntimeError(f"rate limited (HTTP 429) after {attempt + 1}/3 attempts")
                 time.sleep(2 ** attempt)
                 continue
             resp.raise_for_status()
-            return json.loads(resp.json()["choices"][0]["message"]["content"]), "Groq · Llama"
-        except Exception:
+            return resp.json()["choices"][0]["message"]["content"]
+        except Exception as exc:
+            last_exc = exc
             if attempt == 2:
                 raise
-    raise RuntimeError("Groq API failed after retries")
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"Groq API error: {last_exc}")
+
+
+def call_llm(
+    prompt: str,
+    system: str = "",
+    groq_extra: str = "",
+    groq_system_prompt: str = "",
+    groq_extra_header: str = "## ADDITIONAL CONTEXT",
+    log_prefix: str = "report",
+) -> tuple[dict, str]:
+    """
+    Tries providers in order: OpenRouter (OPENROUTER_MODEL) -> Anthropic
+    (direct) -> Groq. Each stage is skipped if its API key isn't set in the
+    environment; any other failure (timeout, rate limit, bad response) also
+    falls through to the next stage.
+    OpenRouter and Claude receive the full `system` prompt. `groq_system_prompt`
+    is the compact, topic-specific system prompt Groq receives (to avoid 413
+    Payload Too Large) — callers pass their own (e.g.
+    skill_loader.GROQ_SYSTEM_PROMPT for career). `groq_extra` is a small,
+    separately-bounded supplement appended on top of it under
+    `groq_extra_header` (e.g. a single ascendant's gemstone excerpt, not the
+    full skills bundle OpenRouter/Claude get). `log_prefix` tags console
+    fallback logs by topic.
+    A response that fails JSON parsing is raised immediately rather than
+    falling back further, since a malformed response usually signals a
+    prompt bug the next provider would likely also hit.
+    Returns (parsed_json, provider_label) — provider_label reflects whichever
+    one actually served this request, since the fallback can kick in silently.
+    """
+    stages = [
+        (_call_openrouter, (prompt, system), "OpenRouter"),
+        (_call_claude_direct, (prompt, system), "Claude"),
+        (_call_groq, (prompt, groq_system_prompt, groq_extra, groq_extra_header), "Groq · Llama"),
+    ]
+    reasons: list[str] = []
+    for fn, call_args, label in stages:
+        try:
+            text = fn(*call_args)
+        except ValueError as exc:
+            reasons.append(f"{label}: {exc}")
+            continue
+        except Exception as exc:
+            reasons.append(f"{label}: {type(exc).__name__}: {exc}")
+            logger.warning("[%s] %s error (%s), trying next provider.", log_prefix, label, exc)
+            continue
+        try:
+            return extract_json(text), label
+        except (json.JSONDecodeError, ValueError) as e:
+            raise RuntimeError(f"{label} returned non-JSON: {e}") from e
+
+    raise RuntimeError(f"No LLM provider available — {'; '.join(reasons)}")
 
 
 _FORBIDDEN_TERM_REPLACEMENTS = [
