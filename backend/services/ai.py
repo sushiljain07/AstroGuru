@@ -815,7 +815,14 @@ def _call_openrouter(messages: list[dict], json_mode: bool = False) -> str:
             logger.warning("OpenRouter %s — %s. Falling back to Claude.", resp.status_code, detail)
             raise RuntimeError(f"OpenRouter {resp.status_code}: {detail}")
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        content = resp.json()["choices"][0]["message"].get("content")
+        if not content:
+            # Free-tier models occasionally return content: null (e.g. the
+            # whole response lands in a "reasoning" field instead) as an
+            # HTTP 200 — that's not an exception, so without this check it
+            # would silently propagate None as a "successful" answer.
+            raise RuntimeError("OpenRouter returned empty content")
+        return content
     except RuntimeError:
         raise  # re-raise our own RuntimeError unchanged
     except Exception as exc:
@@ -852,9 +859,9 @@ def _call_claude(messages: list[dict], json_mode: bool = False) -> str:
         kwargs["output_config"] = {"format": {"type": "json_object"}}
     resp = client.messages.create(**kwargs)
     for block in resp.content:
-        if block.type == "text":
+        if block.type == "text" and block.text:
             return block.text
-    return ""
+    raise RuntimeError("Claude returned no text content")
 
 
 def _call_groq(
@@ -889,7 +896,10 @@ def _call_groq(
                 time.sleep(2 ** attempt)
                 continue
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            content = resp.json()["choices"][0]["message"].get("content")
+            if not content:
+                raise RuntimeError("Groq returned empty content")
+            return content
         except Exception as exc:
             last_exc = exc
             logger.warning("Groq attempt %d/%d failed: %s: %s", attempt + 1, retries, type(exc).__name__, exc)
